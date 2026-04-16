@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>SignLens Pro — Alphabets · Numbers · Phrases</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+
+  <!-- MediaPipe via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="src/style.css"/>
+</head>
+<body>
+
+<!-- PERMISSION SCREEN -->
+<div id="perm">
+  <div class="perm-card">
+    <div class="perm-icon">🤟</div>
+    <div class="perm-title">Sign<span style="color:var(--alpha)">Lens</span> Pro</div>
+    <div class="perm-desc">Real-time recognition for alphabets, numbers, words and phrases using your webcam and MediaPipe. Everything runs locally — nothing is uploaded.</div>
+    <div class="perm-cats">
+      <span class="cat-pill cp-a">A–Z Alphabets</span>
+      <span class="cat-pill cp-n">0–9 Numbers</span>
+      <span class="cat-pill cp-w">20 Words</span>
+      <span class="cat-pill cp-p">14 Phrases</span>
+    </div>
+    <button class="btn-go" onclick="startCamera()">Enable Camera &amp; Start</button>
+    <div class="perm-note">Works in Chrome · Edge · Firefox · Safari 14+</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">🤟</div>
+    <div>
+      <div class="logo-text">Sign<em>Lens</em> Pro</div>
+      <div class="logo-sub">Alphabets · Numbers · Phrases</div>
+    </div>
+  </div>
+  <div class="hdr-pills">
+    <div class="hpill hp-info">MediaPipe · 72 Gestures · Browser-only</div>
+    <div class="hpill hp-live"><div class="ldot"></div>LIVE</div>
+  </div>
+</header>
+
+<!-- DATASET MODE SWITCHER -->
+<div class="mode-bar">
+  <span class="mode-label">DATASET:</span>
+  <button class="mode-btn active-all" id="mb-all"    onclick="setMode('all')">All</button>
+  <button class="mode-btn"            id="mb-alpha"  onclick="setMode('alpha')">A–Z Alphabets</button>
+  <button class="mode-btn"            id="mb-num"    onclick="setMode('num')">0–9 Numbers</button>
+  <button class="mode-btn"            id="mb-word"   onclick="setMode('word')">Words</button>
+  <button class="mode-btn"            id="mb-phrase" onclick="setMode('phrase')">Phrases</button>
+  <span class="total-badge" id="totalBadge">72 total classes active</span>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- Camera -->
+  <div class="cam-panel">
+    <div class="cam-wrap">
+      <video id="videoEl" autoplay playsinline muted></video>
+      <canvas id="canvasEl"></canvas>
+      <div class="cam-scan"></div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="cam-badge">CAM ◆ MEDIAPIPE HANDS ◆ LIVE</div>
+      <div class="mode-indicator" id="modeIndicator" style="background:rgba(6,8,16,.85);border:1px solid rgba(0,229,160,.3);color:var(--alpha)">ALL DATASETS</div>
+      <div class="hand-status" id="handStatus">
+        <div class="hdot"></div><span id="hlabel">No hand detected</span>
+      </div>
+      <div class="fps-badge" id="fpsBadge">-- FPS</div>
+    </div>
+  </div>
+
+  <!-- Output text -->
+  <div class="out-panel">
+    <div class="card">
+      <div class="card-hdr">
+        <div class="clabel">// RECOGNIZED TEXT</div>
+        <div class="btns">
+          <button class="bg" onclick="speakText()">🔊 Speak</button>
+          <button class="ba" onclick="copyText(this)">⎘ Copy</button>
+          <button class="bd" onclick="clearAll()">⌫ Clear</button>
+        </div>
+      </div>
+      <div class="text-disp empty" id="textDisp">Show a gesture to begin…<span class="cur"></span></div>
+      <div class="chips" id="chips"></div>
+    </div>
+  </div>
+
+  <!-- Output type reference -->
+  <div class="type-cards">
+    <div class="type-grid">
+      <div class="type-card">
+        <div class="tc-title" style="color:var(--alpha)">Alphabet (A–Z)</div>
+        <div class="tc-desc">Single letter sign. Appends to current word buffer one character at a time.</div>
+        <span class="tc-out tco-a">→ "H", "E", "L"…</span>
+      </div>
+      <div class="type-card">
+        <div class="tc-title" style="color:var(--num)">Number (0–9)</div>
+        <div class="tc-desc">Number sign. Converts ZERO→0, ONE→1 … NINE→9 and appends as digit.</div>
+        <span class="tc-out tco-n">→ "3", "7", "0"…</span>
+      </div>
+      <div class="type-card">
+        <div class="tc-title" style="color:var(--word)">Word</div>
+        <div class="tc-desc">Whole-word gesture (HELLO, YES, PLEASE…). Inserts complete capitalized word.</div>
+        <span class="tc-out tco-w">→ "Hello", "Please"</span>
+      </div>
+      <div class="type-card">
+        <div class="tc-title" style="color:var(--phrase)">Phrase</div>
+        <div class="tc-desc">Full phrase gesture. Expands HOW_ARE_YOU → "How are you" etc.</div>
+        <span class="tc-out tco-p">→ "How are you"</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Detection card -->
+    <div class="det-card">
+      <div class="clabel">// CURRENT GESTURE</div>
+      <div class="ring-area">
+        <svg viewBox="0 0 128 128">
+          <defs>
+            <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop id="rg1" offset="0%" stop-color="#00aaff"/>
+              <stop id="rg2" offset="100%" stop-color="#00e5a0"/>
+            </linearGradient>
+          </defs>
+          <circle cx="64" cy="64" r="58" fill="none" stroke="var(--dim)" stroke-width="5"/>
+          <circle cx="64" cy="64" r="58" fill="none" stroke="url(#rg)" stroke-width="5"
+            stroke-linecap="round" stroke-dasharray="364" stroke-dashoffset="364"
+            transform="rotate(-90 64 64)" id="ringCircle" style="transition:stroke-dashoffset .4s cubic-bezier(.4,0,.2,1)"/>
+        </svg>
+        <div class="ring-center">
+          <div class="det-letter empty" id="detLetter">—</div>
+          <div class="det-conf" id="detConf">0%</div>
+        </div>
+      </div>
+      <div class="type-badge" id="typeBadge">WAITING</div>
+      <div class="stab-wrap">
+        <div class="bar-row"><span>STABILITY</span><span id="stabVal">0 / 5</span></div>
+        <div class="bar-track"><div class="bar-fill" id="stabFill"></div></div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="sbox"><div class="snum snum-a" id="sA">0</div><div class="slbl">LETTERS</div></div>
+      <div class="sbox"><div class="snum snum-n" id="sN">0</div><div class="slbl">DIGITS</div></div>
+      <div class="sbox"><div class="snum snum-w" id="sW">0</div><div class="slbl">WORDS</div></div>
+      <div class="sbox"><div class="snum snum-p" id="sP">0</div><div class="slbl">PHRASES</div></div>
+    </div>
+
+    <!-- History log -->
+    <div class="hist-card">
+      <div class="card-hdr">
+        <div class="clabel">// DETECTION LOG</div>
+        <button class="bg" style="font-size:.62rem;padding:4px 9px" onclick="clearHist()">Clear</button>
+      </div>
+      <div class="hist-list" id="histList">
+        <div style="text-align:center;color:var(--dim);font-size:.75rem;padding:14px 0">No detections yet</div>
+      </div>
+    </div>
+
+    <!-- Gesture reference -->
+    <div class="ref-card">
+      <div class="clabel">// GESTURE REFERENCE</div>
+      <div class="ref-tabs">
+        <button class="rtab on" onclick="switchRef('alpha',this)">A–Z</button>
+        <button class="rtab" onclick="switchRef('num',this)">0–9</button>
+        <button class="rtab" onclick="switchRef('word',this)">Words</button>
+        <button class="rtab" onclick="switchRef('phrase',this)">Phrases</button>
+      </div>
+      <div class="rcontent on" id="ref-alpha"><div class="agrid" id="agrid"></div></div>
+      <div class="rcontent" id="ref-num"><div class="ngrid" id="ngrid"></div></div>
+      <div class="rcontent" id="ref-word"><div class="wchips" id="wgrid"></div></div>
+      <div class="rcontent" id="ref-phrase"><div class="pchips" id="pgrid"></div></div>
+    </div>
+
+  </aside>
+</main>
+
+<script src="src/data.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/classifier.js"></script>
+<script src="src/camera.js"></script>
+</body>
+</html>
